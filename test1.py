@@ -78,7 +78,7 @@ from xgboost.sklearn import XGBClassifier
 import lightgbm as lgb
 
 
-data_train_x, data_test_x, data_train_y, data_test_y = train_test_split(train_x, train_y, test_size=0.25,random_state=13)
+data_train_x, data_test_x, data_train_y, data_test_y = train_test_split(train_x, train_y, test_size=0.25,random_state=59)
 
 def show_accuracy(model,x_train,x_test,y_train,y_test):
     from sklearn.metrics import accuracy_score, recall_score, precision_score, f1_score
@@ -104,7 +104,17 @@ def show_accuracy(model,x_train,x_test,y_train,y_test):
     print('测试集AUC：',metrics.auc(fpr,tpr))
 
 
-lgbm = lgb.LGBMClassifier(silent=False)
+lgbm = lgb.LGBMClassifier(boosting_type='gbdt',
+                         objective = 'binary',
+                         metric = 'auc',
+                         verbose = 0,
+                         learning_rate = 0.01,
+                         num_leaves = 35,
+                         feature_fraction=0.8,
+                         bagging_fraction= 0.9,
+                         bagging_freq= 8,
+                         lambda_l1= 0.6,
+                         lambda_l2= 0)
 param_dist = {"max_depth": np.arange(10,40,5),
             "learning_rate" : [0.02,0.05,0.07],
             "num_leaves": [100,200,300],
@@ -117,4 +127,43 @@ model1 = model.best_estimator_
 show_accuracy(model1,data_train_x, data_test_x, data_train_y, data_test_y)
 
 
+
+
+
+
 train_x.to_csv('train_x.csv',sep=',',index=False)
+
+
+
+
+
+parameters = {
+              'max_depth': [15, 20, 25, 30, 35],
+              'learning_rate': [0.01, 0.02, 0.05, 0.1, 0.15],
+              'feature_fraction': [0.6, 0.7, 0.8, 0.9, 0.95],
+              'bagging_fraction': [0.6, 0.7, 0.8, 0.9, 0.95],
+              'bagging_freq': [2, 4, 5, 6, 8],
+              'lambda_l1': [0, 0.1, 0.4, 0.5, 0.6],
+              'lambda_l2': [0, 10, 15, 35, 40],
+              'cat_smooth': [1, 10, 15, 20, 35]
+}
+gbm = lgb.LGBMClassifier(boosting_type='gbdt',
+                         objective = 'binary',
+                         metric = 'auc',
+                         verbose = 0,
+                         learning_rate = 0.01,
+                         num_leaves = 35,
+                         feature_fraction=0.8,
+                         bagging_fraction= 0.9,
+                         bagging_freq= 8,
+                         lambda_l1= 0.6,
+                         lambda_l2= 0)
+# 有了gridsearch我们便不需要fit函数
+gsearch = GridSearchCV(gbm, param_grid=parameters, scoring='accuracy', cv=3)
+gsearch.fit(train_x, train_y)
+
+print("Best score: %0.3f" % gsearch.best_score_)
+print("Best parameters set:")
+best_parameters = gsearch.best_estimator_.get_params()
+for param_name in sorted(parameters.keys()):
+    print("\t%s: %r" % (param_name, best_parameters[param_name]))
