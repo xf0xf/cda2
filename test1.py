@@ -24,6 +24,14 @@ train_x0 = train.drop(['Purchase'],axis=1)
 
 #automl
 
+na_list = ['score','gender','age','using_time','balance','usage','card','Active','salary']
+col_number_input = ['score','age','using_time','balance','usage','card','Active','salary']
+input_num = train[col_number_input].median()
+col_class_input = ['age']
+input_class = train[col_class_input].mode()
+col_onehot = ['area','gender']
+col_standar = ['balance','salary']
+
 train_y.value_counts()
 
 
@@ -31,28 +39,25 @@ def fe(df):
     def num_missing(x):  return sum(x.isnull()) 
     df['num_null'] = train.apply(num_missing, axis=1)
     #增加字段是否为空标识
-    na_list = ['score','gender','age','using_time','balance','usage','card','Active','salary']
     na_list_name = [a+'_isna' for a in na_list]
     df[na_list_name] = df[na_list].isnull()
     df[na_list_name] = df[na_list_name].astype(int)
     
     #连续变量缺失值填充
-    col_input = ['score','age','using_time','balance','usage','card','Active','salary']
-    input_num = df[col_input].median()
-    for col in col_input:
+    for col in col_number_input:
         df[col] = df[col].fillna(input_num[col])
     
     #离散变量缺失值填充
+    for col in col_class_input:
+        df[col] = df[col].fillna(input_class[col])
     
     #one-hot
-    col_onehot = ['area','gender']
     df = pd.get_dummies(df,columns=col_onehot)
     
     #处理极值
     train['salary'][train['salary']<1796] = 1796
     
     #标准化
-    col_standar = ['balance','salary']
     scaler = StandardScaler()
     df[col_standar] = scaler.fit_transform(df[col_standar])
 
@@ -74,18 +79,6 @@ import lightgbm as lgb
 
 
 data_train_x, data_test_x, data_train_y, data_test_y = train_test_split(train_x, train_y, test_size=0.25,random_state=13)
-
-lgbm = lgb.LGBMClassifier(silent=False)
-param_dist = {"max_depth": np.arange(10,40,5),
-            "learning_rate" : [0.02,0.05,0.07],
-            "num_leaves": [100,200,300],
-            "n_estimators": np.arange(50,100,10)
-             }
-model = GridSearchCV(lgbm, n_jobs=-1, param_grid=param_dist, cv = 3, scoring="f1", verbose=5)
-model.fit(data_train_x,data_train_y)
-print('最优参数：', model.best_params_)
-model1 = model.best_estimator_
-show_accuracy(model1,data_train_x, data_test_x, data_train_y, data_test_y)
 
 def show_accuracy(model,x_train,x_test,y_train,y_test):
     from sklearn.metrics import accuracy_score, recall_score, precision_score, f1_score
@@ -109,6 +102,19 @@ def show_accuracy(model,x_train,x_test,y_train,y_test):
     print('测试集F1 值：', f1_score(y_test, y_test_pre))
     fpr,tpr,thresholds = roc_curve(y_test,probs_test)
     print('测试集AUC：',metrics.auc(fpr,tpr))
-    
+
+
+lgbm = lgb.LGBMClassifier(silent=False)
+param_dist = {"max_depth": np.arange(10,40,5),
+            "learning_rate" : [0.02,0.05,0.07],
+            "num_leaves": [100,200,300],
+            "n_estimators": np.arange(50,100,10)
+             }
+model = GridSearchCV(lgbm, n_jobs=-1, param_grid=param_dist, cv = 5, scoring="f1", verbose=5)
+model.fit(data_train_x,data_train_y)
+print('最优参数：', model.best_params_)
+model1 = model.best_estimator_
+show_accuracy(model1,data_train_x, data_test_x, data_train_y, data_test_y)
+
 
 train_x.to_csv('train_x.csv',sep=',',index=False)
