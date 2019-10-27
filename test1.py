@@ -151,7 +151,7 @@ gbm = lgb.LGBMClassifier(boosting_type='gbdt',
                          lambda_l1= 0.6,
                          lambda_l2= 0)
 # 有了gridsearch我们便不需要fit函数
-gsearch = GridSearchCV(gbm, param_grid=parameters, scoring='accuracy', cv=3)
+gsearch = GridSearchCV(gbm, param_grid=parameters, scoring='f1', cv=3,verbose=1, n_jobs=-1)
 gsearch.fit(data_train_x,data_train_y)
 
 print("Best score: %0.3f" % gsearch.best_score_)
@@ -167,28 +167,32 @@ show_accuracy(model1,data_train_x, data_test_x, data_train_y, data_test_y)
 ##一、
 params = {    'boosting_type': 'gbdt', 
     'objective': 'binary', 
-    'learning_rate': 0.05, 
-    'num_leaves': 50, 
+    'learning_rate': 0.1, 
+    'num_leaves': 30, 
     'max_depth': 6,    'subsample': 0.8, 
     'colsample_bytree': 0.8, 
+    'is_unbalance':True
     }
 data_train = lgb.Dataset(data_train_x,data_train_y, silent=True)
 cv_results = lgb.cv(
-    params, data_train, num_boost_round=1000, nfold=5, stratified=False, shuffle=True, metrics='rmse',
-    early_stopping_rounds=50, verbose_eval=50, show_stdv=True, seed=0)
-print('best n_estimators:', len(cv_results['rmse-mean']))
-print('best cv score:', cv_results['rmse-mean'][-1])
+    params, data_train, num_boost_round=1000, nfold=5, stratified=False, shuffle=True, metrics='auc',
+    early_stopping_rounds=50,verbose_eval=50, show_stdv=True, seed=0)
+print('best n_estimators:', len(cv_results['auc-mean']))
+print('best cv score:', pd.Series(cv_results['auc-mean']).max())
 
 
 ###二、
 model_lgb = lgb.LGBMClassifier(objective='binary',
                               num_leaves=50,
                               learning_rate=0.05, 
-                              n_estimators=112, 
+                              n_estimators=29, 
                               max_depth=6,
                               metric='auc', 
                               bagging_fraction = 0.8,
-                              feature_fraction = 0.8)
+                              feature_fraction = 0.8,
+                              is_unbalance=True,
+                              #scale_pos_weight=40
+                              )
 params_test1 = {'max_depth': range(3,8,1),
                 'num_leaves':range(50, 170, 10)}
 gsearch1 = GridSearchCV(estimator=model_lgb, 
@@ -200,41 +204,51 @@ gsearch1.cv_results_['mean_test_score'] , gsearch1.best_params_, gsearch1.best_s
 
 
 ###三、
-params_test3={'min_child_samples': np.arange(18, 22),
-              #'min_child_weight':np.arange(0.001, 0.005, 0.001)
+params_test3={'min_child_samples': np.arange(5, 25),
+              'min_child_weight':np.arange(0, 0.005, 0.001)
               }
 model_lgb = lgb.LGBMClassifier(objective='binary',
-                               num_leaves=80,
+                               num_leaves=50,
                                learning_rate=0.05, 
-                               n_estimators=112, 
+                               n_estimators=29, 
                                max_depth=7, 
                                metric='auc', 
                                bagging_fraction = 0.8, 
-                               feature_fraction = 0.8)
+                               feature_fraction = 0.8,
+                               is_unbalance=True,
+                              #scale_pos_weight=40
+                              )
 gsearch3 = GridSearchCV(estimator=model_lgb, param_grid=params_test3, scoring='f1', cv=5, verbose=1, n_jobs=-1)
 gsearch3.fit(data_train_x,data_train_y)
 gsearch3.best_params_, gsearch3.best_score_
 
 ###四、
 params_test4={
-        'feature_fraction': [0.5, 0.6, 0.7, 0.8, 0.9],
+        'feature_fraction': [0.2,0.3,0.4,0.5, 0.6, 0.7, 0.8, 0.9],
         'bagging_fraction': [0.6, 0.7, 0.8, 0.9, 1.0]
         }
-model_lgb = lgb.LGBMClassifier(objective='binary',num_leaves=80,
-                              learning_rate=0.05, n_estimators=112, max_depth=7, 
-                              metric='auc', bagging_freq = 5,  min_child_samples=20)
+model_lgb = lgb.LGBMClassifier(objective='binary',num_leaves=50,
+                              learning_rate=0.05, n_estimators=29, max_depth=7, 
+                              metric='auc', bagging_freq = 5,  min_child_samples=19,
+                              is_unbalance=True,
+                              #scale_pos_weight=40
+                              )
 gsearch4 = GridSearchCV(estimator=model_lgb, param_grid=params_test4, scoring='f1', cv=5, verbose=1, n_jobs=-1)
 gsearch4.fit(data_train_x,data_train_y)
 gsearch4.best_params_, gsearch4.best_score_
 
 ###五、
 params_test6={
-        'reg_alpha': [0, 0.001, 0.01, 0.03, 0.08, 0.3, 0.5],    
-        'reg_lambda': [0, 0.001, 0.01, 0.03, 0.08, 0.3, 0.5]
+        'lambda_l1': [0, 0.001, 0.01, 0.03, 0.08, 0.3, 0.5],  
+        #'lambda_l1': np.arange(0.2, 0.5, 0.05),  
+        'lambda_l2': [0, 0.001, 0.01, 0.03, 0.08, 0.3, 0.5]
         }
-model_lgb = lgb.LGBMClassifier(objective='binary',num_leaves=80,
-                              learning_rate=0.05, n_estimators=112, max_depth=7, 
-                              metric='auc',  min_child_samples=20, feature_fraction=0.8,bagging_fraction=0.6)
+model_lgb = lgb.LGBMClassifier(objective='binary',num_leaves=50,
+                              learning_rate=0.05, n_estimators=29, max_depth=7, 
+                              metric='auc',  min_child_samples=19, feature_fraction=0.8,bagging_fraction=1,
+                              is_unbalance=True,
+                              #scale_pos_weight=40
+                              )
 gsearch6 = GridSearchCV(estimator=model_lgb, param_grid=params_test6, scoring='f1', cv=5, verbose=1, n_jobs=-1)
 gsearch6.fit(data_train_x,data_train_y)
 gsearch6.best_params_, gsearch6.best_score_
@@ -242,10 +256,13 @@ gsearch6.best_params_, gsearch6.best_score_
     
 ###六、
 params = {'boosting_type': 'gbdt', 'objective': 'binary', 
-          'learning_rate': 0.005, 'n_estimators':112,
-          'max_depth': 7,'num_leaves': 80,
-          'min_child_samples':20,
-          'feature_fraction':0.8,'bagging_fraction':0.6
+          'learning_rate': 0.005, 'n_estimators':29,
+          'max_depth': 7,'num_leaves': 50,
+          'min_child_samples':19,
+          'feature_fraction':0.8,'bagging_fraction':1,
+          'reg_alpha':0.001,'reg_lambda':0,
+          'is_unbalance':True
+          #'scale_pos_weight':7
           }
 data_train = lgb.Dataset(data_train_x,data_train_y, silent=True)
 cv_results = lgb.cv(
@@ -258,10 +275,14 @@ print('best cv score:', cv_results['auc-mean'][-1])
 
 ####计算模型
 model_lgb = lgb.LGBMClassifier(boosting_type='gbdt',objective='binary',metric='auc', 
-                               learning_rate= 0.005, n_estimators=112,
-                               max_depth= 7,num_leaves=80,
-                               min_child_samples=20,
-                               bagging_fraction = 0.6,feature_fraction = 0.8)
+                               learning_rate= 0.001, n_estimators=29,
+                               max_depth= 7,num_leaves=50,
+                               min_child_samples=19,
+                               bagging_fraction = 0.8,feature_fraction = 1,
+                               lambda_l1=0,lambda_l2=0.08,
+                               is_unbalance=True
+                               #scale_pos_weight=40
+                               )
 model_lgb.fit(data_train_x,data_train_y)
 show_accuracy(model_lgb,data_train_x, data_test_x, data_train_y, data_test_y)
 
