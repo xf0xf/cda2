@@ -108,6 +108,7 @@ lgbm = lgb.LGBMClassifier(boosting_type='gbdt',
                          objective = 'binary',
                          metric = 'auc',
                          verbose = 0,
+                         is_unbalance=True,
                          learning_rate = 0.1,
                          num_leaves = 35,
                          feature_fraction=0.8,
@@ -130,37 +131,56 @@ train_x.to_csv('train_x.csv',sep=',',index=False)
 
 ####复杂调参
 parameters = {
-              'max_depth': [15, 20, 25, 30, 35],
-              'learning_rate': [0.01, 0.02, 0.05, 0.1, 0.15],
-              'feature_fraction': [0.6, 0.7, 0.8, 0.9, 0.95],
-              'bagging_fraction': [0.6, 0.7, 0.8, 0.9, 0.95],
-              'bagging_freq': [2, 4, 5, 6, 8],
-              'lambda_l1': [0, 0.1, 0.4, 0.5, 0.6],
-              'lambda_l2': [0, 10, 15, 35, 40],
-              'cat_smooth': [1, 10, 15, 20, 35]
-}
-gbm = lgb.LGBMClassifier(boosting_type='gbdt',
-                         objective = 'binary',
-                         metric = 'auc',
-                         verbose = 0,
+        #'learning_rate': [0.01, 0.02, 0.05, 0.1, 0.15],
+        #'n_estimators': np.arange(50,100,10),
+        #'max_depth': range(3,10,1),
+        #'num_leaves':range(16, 40, 2),
+        #'min_child_samples': np.arange(5, 25),
+        #'bagging_fraction': [0.6, 0.7, 0.8, 0.9, 0.95,1.0],
+        #'bagging_freq': range(3,8),
+        #'feature_fraction': np.arange(0.5,1.0,0.05),
+        #'lambda_l1': [0, 0.01, 0.05, 0.1, 0.4, 0.5, 0.6],
+        #'lambda_l2': [0, 0.05, 0.1, 0.2, 0.5, 1],
+        'cat_smooth': [1,2,3,5, 10, 15, 20, 35]
+        }
+gbm = lgb.LGBMClassifier(boosting_type='gbdt',objective = 'binary', metric = 'auc', is_unbalance=True,verbose = 1,
                          learning_rate = 0.01,
-                         num_leaves = 35,
-                         feature_fraction=0.8,
-                         bagging_fraction= 0.9,
-                         bagging_freq= 8,
-                         lambda_l1= 0.6,
-                         lambda_l2= 0)
-# 有了gridsearch我们便不需要fit函数
+                         n_estimators = 60,
+                         max_depth = 6,
+                         num_leaves = 32,
+                         min_child_samples = 20,
+                         bagging_fraction = 0.9,
+                         bagging_freq = 6,
+                         feature_fraction =0.65,
+                         lambda_l1 = 0,
+                         lambda_l2 = 0,
+                         cat_smooth = 1
+                         )
+# 有了gridsearch
 gsearch = GridSearchCV(gbm, param_grid=parameters, scoring='f1', cv=3,verbose=1, n_jobs=-1)
 gsearch.fit(data_train_x,data_train_y)
 
 print("Best score: %0.3f" % gsearch.best_score_)
-print("Best parameters set:")
-best_parameters = gsearch.best_estimator_.get_params()
-for param_name in sorted(parameters.keys()):
-    print("\t%s: %r" % (param_name, best_parameters[param_name]))
-model1 = gsearch.best_estimator_
-show_accuracy(model1,data_train_x, data_test_x, data_train_y, data_test_y)
+print("Best parameters set:",gsearch.best_params_)
+
+
+#计算模型
+model_lgb = lgb.LGBMClassifier(boosting_type='gbdt',objective = 'binary', metric = 'auc', #verbose = 1,is_unbalance=True,
+                         learning_rate = 0.01,
+                         n_estimators = 60,
+                         max_depth = 6,
+                         num_leaves = 32,
+                         min_child_samples = 20,
+                         bagging_fraction = 0.9,
+                         bagging_freq = 6,
+                         feature_fraction =0.65,
+                         lambda_l1 = 0,
+                         lambda_l2 = 0,
+                         cat_smooth = 1
+                               )
+model_lgb.fit(data_train_x,data_train_y)
+show_accuracy(model_lgb,data_train_x, data_test_x, data_train_y, data_test_y)
+
 
 
 ####多阶段调参
