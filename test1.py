@@ -15,14 +15,12 @@ from sklearn.model_selection import train_test_split
 
 
 print(os.getcwd())
-#os.chdir('D:\\work\\sky_drive\\datamining\\cda2\\test_1\\testdata1')
-os.chdir('D:\\py_project\\cda2\\testdata1')
+os.chdir('D:\\work\\sky_drive\\git\\cda2\\testdata1')
+#os.chdir('D:\\py_project\\cda2\\testdata1')
 
 test = pd.read_csv("test30.csv",na_values= ['nan','?'])
 train = pd.read_csv("training30.csv",index_col=0,na_values= ['nan','?'])
 
-train_y = train['Purchase']
-train_x0 = train.drop(['Purchase'],axis=1)
 
 #automl
 na_list = ['score','gender','age','using_time','balance','usage','card','Active','salary']
@@ -32,9 +30,6 @@ col_class_input = ['age']
 input_class = train[col_class_input].mode()
 col_onehot = ['area','gender']
 col_standar = ['balance','salary']
-
-train_y.value_counts()
-
 
 def fe(df):
     def num_missing(x):  return sum(x.isnull()) 
@@ -56,16 +51,32 @@ def fe(df):
     df = pd.get_dummies(df,columns=col_onehot)
     
     #处理极值
-    train['salary'][train['salary']<1796] = 1796
+    df['salary'][df['salary']<1796] = 1796
     
     #标准化
     scaler = StandardScaler()
-    df[col_standar] = scaler.fit_transform(df[col_standar])
+    df_col_stander = df[col_standar].copy()
+    df[col_standar] = scaler.fit_transform(df_col_stander)
 
     return df
 
-train_x = fe(train_x0)
+train_fe = fe(train)
+#train_x = fe(train)
+#train_x.to_csv('train_x.csv',sep=',',index=True)
 
+#样本均衡
+def sample_banlance(train_0,train_1):
+    n = min(len(train_0),len(train_1))
+    sample_train_0 = train_0.sample(n)
+    sample_train_1 = train_1.sample(n)
+    data = pd.concat([sample_train_0,sample_train_1])
+    return data
+
+train_fe_banlance = sample_banlance(train_fe[train_fe['Purchase']==1],train_fe[train_fe['Purchase']==0])
+train_fe_banlance['Purchase'].value_counts()
+
+train_feban_y = train_fe_banlance['Purchase']
+train_feban_x0 = train_fe_banlance.drop(['Purchase'],axis=1)
 
 from sklearn.linear_model.logistic import LogisticRegression
 from sklearn import svm
@@ -78,7 +89,9 @@ from xgboost.sklearn import XGBClassifier
 import lightgbm as lgb
 
 
-data_train_x, data_test_x, data_train_y, data_test_y = train_test_split(train_x, train_y, test_size=0.25,random_state=59)
+data_train_x, data_test_x, data_train_y, data_test_y = train_test_split(train_feban_x0, train_feban_y, test_size=0.25,random_state=59)
+data_train_y.value_counts()
+data_test_y.value_counts()
 
 def show_accuracy(model,x_train,x_test,y_train,y_test):
     from sklearn.metrics import accuracy_score, recall_score, precision_score, f1_score
@@ -102,6 +115,22 @@ def show_accuracy(model,x_train,x_test,y_train,y_test):
     print('测试集F1 值：', f1_score(y_test, y_test_pre))
     fpr,tpr,thresholds = roc_curve(y_test,probs_test)
     print('测试集AUC：',metrics.auc(fpr,tpr))
+
+#随机森林
+rf = RandomForestClassifier(n_estimators=50, criterion='gini', max_depth=7, min_samples_leaf=11, min_samples_split=30, max_features=0.5,n_jobs=-1)
+param = {'n_estimators':np.arange(50,200,25),
+         'max_features':np.arange(2, 8),
+        'max_depth':np.arange(2,10,2), 
+        #'min_samples_leaf':np.arange(2,10,2),
+        #'min_samples_split':np.arange(2, 53, 10)
+		'class_weight':['balanced', None]
+        }
+model = GridSearchCV(rf, param_grid=param, cv=4,scoring='f1',n_jobs=-1,verbose=5)
+model.fit(data_train_x, data_train_y)
+print('最优参数：', model.best_params_)
+model1 = model.best_estimator_
+show_accuracy(model1,data_train_x, data_test_x, data_train_y, data_test_y)
+
 
 #####自定义调参
 lgbm = lgb.LGBMClassifier(boosting_type='gbdt',
@@ -127,7 +156,7 @@ print('最优参数：', model.best_params_)
 model1 = model.best_estimator_
 show_accuracy(model1,data_train_x, data_test_x, data_train_y, data_test_y)
 
-train_x.to_csv('train_x.csv',sep=',',index=False)
+
 
 ####复杂调参
 parameters = {
