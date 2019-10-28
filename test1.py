@@ -11,6 +11,7 @@ Created on Tue Oct 22 14:22:56 2019
 5.组合特征
 6.greadsearch vs 
 
+########## 一、导入 ##########
 
 import pandas as pd
 import numpy as np
@@ -22,12 +23,14 @@ from sklearn.model_selection import train_test_split
 
 
 print(os.getcwd())
-os.chdir('D:\\work\\sky_drive\\git\\cda2\\testdata1')
-#os.chdir('D:\\py_project\\cda2\\testdata1')
+#os.chdir('D:\\work\\sky_drive\\git\\cda2\\testdata1')
+os.chdir('D:\\py_project\\cda2\\testdata1')
 
 test = pd.read_csv("test30.csv",na_values= ['nan','?'])
 train = pd.read_csv("training30.csv",na_values= ['nan','?'])
 test.columns = train.columns
+
+########## 二、特征工程 ##########
 
 #automl
 na_list = ['score','gender','age','using_time','balance','usage','card','Active','salary']
@@ -75,8 +78,10 @@ test_fe = fe(test)
 #train_x = fe(train)
 #train_x.to_csv('train_x.csv',sep=',',index=True)
 
+########## 三、数据变换 ##########
 
-###1.先样本均衡，再分数据
+###（一）先样本均衡，再分数据
+
 #1.样本均衡
 def sample_banlance(train_0,train_1):
     n = min(len(train_0),len(train_1))
@@ -87,15 +92,16 @@ def sample_banlance(train_0,train_1):
 
 train_fe_banlance = sample_banlance(train_fe[train_fe['Purchase']==1],train_fe[train_fe['Purchase']==0])
 train_fe_banlance['Purchase'].value_counts()
+
 #2.数据拆分
 train_feban_y = train_fe_banlance['Purchase']
 train_feban_x0 = train_fe_banlance.drop(['Purchase','ID'],axis=1)
 
 data_train_x, data_test_x, data_train_y, data_test_y = train_test_split(train_feban_x0, train_feban_y, test_size=0.25,random_state=59)
 data_train_y.value_counts()
-data_test_y.value_counts()
 
-###2.先分数据，再做样本均衡
+###（二）先分数据，再做样本均衡
+
 #1.数据拆分
 train_feban_y = train_fe['Purchase']
 train_feban_x0 = train_fe.drop(['Purchase','ID'],axis=1)
@@ -111,7 +117,7 @@ data_train_x = train_fe_banlance.drop(['Purchase'],axis=1)
 
 data_train_y.value_counts()
 
-####模型训练
+########## 四、模型训练 ##########
 
 from sklearn.linear_model.logistic import LogisticRegression
 from sklearn import svm
@@ -130,21 +136,25 @@ def show_accuracy(model,x_train,x_test,y_train,y_test):
     
     y_train_pre = model.predict(x_train)
     probs_train = model.predict_proba(x_train)[:,1]
-    print('训练集正确率(accuracy_score)：', accuracy_score(y_train, y_train_pre))
-    print('训练集召回率(recall_score)：', recall_score(y_train, y_train_pre))
-    print('训练集精确度：', precision_score(y_train, y_train_pre))
-    print('训练集F1 值：', f1_score(y_train, y_train_pre))
     fpr,tpr,thresholds = roc_curve(y_train,probs_train)
-    print('训练集AUC：',metrics.auc(fpr,tpr))
-    
     y_test_pre = model.predict(x_test)
     probs_test = model.predict_proba(x_test)[:,1]
-    print('测试集正确率(accuracy_score)：', accuracy_score(y_test, y_test_pre))
-    print('测试集召回率(recall_score)：', recall_score(y_test, y_test_pre))
-    print('测试集精确度：', precision_score(y_test, y_test_pre))
-    print('测试集F1 值：', f1_score(y_test, y_test_pre))
     fpr,tpr,thresholds = roc_curve(y_test,probs_test)
-    print('测试集AUC：',metrics.auc(fpr,tpr))
+
+    model_accu = {'train_accuracy_score':round(accuracy_score(y_train, y_train_pre),4),
+                  'train_recall_score':round(recall_score(y_train, y_train_pre),4),
+                  'train_precision_score':round(precision_score(y_train, y_train_pre),4),
+                  'train_f1_score':round(f1_score(y_train, y_train_pre),4),
+                  'train_auc':round(metrics.auc(fpr,tpr),4),
+                  'test_accuracy_score':round(accuracy_score(y_test, y_test_pre),4),
+                  'test_recall_score':round(recall_score(y_test, y_test_pre),4),
+                  'test_precision_score':round(precision_score(y_test, y_test_pre),4),
+                  'test_f1_score':round(f1_score(y_test, y_test_pre),4),
+                  'test_auc':round(metrics.auc(fpr,tpr),4)
+                  }
+    print(pd.Series(model_accu))
+    return pd.Series(model_accu)
+    
 
 #随机森林
 rf = RandomForestClassifier(n_estimators=50, criterion='gini', max_depth=7, min_samples_leaf=11, min_samples_split=30, max_features=0.5,n_jobs=-1)
@@ -159,7 +169,7 @@ model = GridSearchCV(rf, param_grid=param, cv=4,scoring='f1',n_jobs=-1,verbose=5
 model.fit(data_train_x, data_train_y)
 print('最优参数：', model.best_params_)
 model1 = model.best_estimator_
-show_accuracy(model1,data_train_x, data_test_x, data_train_y, data_test_y)
+rf_model_resule = show_accuracy(model1,data_train_x, data_test_x, data_train_y, data_test_y)
 
 
 #lightgbm 自定义调参
@@ -194,6 +204,25 @@ show_accuracy(model1,data_train_x, data_test_x, data_train_y, data_test_y)
 5.模型结果计算
 
 
+
+
+'''
+1.多种模型结果最后训练分别提交
+2.搜索出来的最佳模型直接作为成熟模型；
+3.将模型参数抄出来重新单独训练的模型；（在全量训练数据下进一步训练）
+4.将模型参数抄出来重新单独训练的模型；（和全量训练数据构建平衡样本训练数据进一步训练）
+'''
+#3.数据
+train_feban_y = train_fe['Purchase']
+train_feban_x0 = train_fe.drop(['Purchase','ID'],axis=1)
+#4.数据
+train_fe_banlance = sample_banlance(train_fe[train_fe['Purchase']==1],train_fe[train_fe['Purchase']==0])
+train_fe_banlance['Purchase'].value_counts()
+train_feban_y = train_fe['Purchase']
+train_feban_x0 = train_fe.drop(['Purchase','ID'],axis=1)
+
+
+########## 五、预测 ##########
 
 
 ####复杂调参
