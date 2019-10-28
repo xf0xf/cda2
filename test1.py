@@ -4,6 +4,13 @@ Created on Tue Oct 22 14:22:56 2019
 
 @author: xfxf
 """
+0.先样本均衡，后测试
+1.先分数据，再样本均衡
+3.多模型综合
+4.imblearn
+5.组合特征
+6.greadsearch vs 
+
 
 import pandas as pd
 import numpy as np
@@ -19,8 +26,8 @@ os.chdir('D:\\work\\sky_drive\\git\\cda2\\testdata1')
 #os.chdir('D:\\py_project\\cda2\\testdata1')
 
 test = pd.read_csv("test30.csv",na_values= ['nan','?'])
-train = pd.read_csv("training30.csv",index_col=0,na_values= ['nan','?'])
-
+train = pd.read_csv("training30.csv",na_values= ['nan','?'])
+test.columns = train.columns
 
 #automl
 na_list = ['score','gender','age','using_time','balance','usage','card','Active','salary']
@@ -31,9 +38,12 @@ input_class = train[col_class_input].mode()
 col_onehot = ['area','gender']
 col_standar = ['balance','salary']
 
-def fe(df):
+def fe(data):
+    df = data.copy()
+    #缺失个数
     def num_missing(x):  return sum(x.isnull()) 
-    df['num_null'] = train.apply(num_missing, axis=1)
+    df['num_null'] = df.apply(num_missing, axis=1)
+    
     #增加字段是否为空标识
     na_list_name = [a+'_isna' for a in na_list]
     df[na_list_name] = df[na_list].isnull()
@@ -61,10 +71,13 @@ def fe(df):
     return df
 
 train_fe = fe(train)
+test_fe = fe(test)
 #train_x = fe(train)
 #train_x.to_csv('train_x.csv',sep=',',index=True)
 
-#样本均衡
+
+###1.先样本均衡，再分数据
+#1.样本均衡
 def sample_banlance(train_0,train_1):
     n = min(len(train_0),len(train_1))
     sample_train_0 = train_0.sample(n)
@@ -74,9 +87,31 @@ def sample_banlance(train_0,train_1):
 
 train_fe_banlance = sample_banlance(train_fe[train_fe['Purchase']==1],train_fe[train_fe['Purchase']==0])
 train_fe_banlance['Purchase'].value_counts()
-
+#2.数据拆分
 train_feban_y = train_fe_banlance['Purchase']
-train_feban_x0 = train_fe_banlance.drop(['Purchase'],axis=1)
+train_feban_x0 = train_fe_banlance.drop(['Purchase','ID'],axis=1)
+
+data_train_x, data_test_x, data_train_y, data_test_y = train_test_split(train_feban_x0, train_feban_y, test_size=0.25,random_state=59)
+data_train_y.value_counts()
+data_test_y.value_counts()
+
+###2.先分数据，再做样本均衡
+#1.数据拆分
+train_feban_y = train_fe['Purchase']
+train_feban_x0 = train_fe.drop(['Purchase','ID'],axis=1)
+data_train_x, data_test_x, data_train_y, data_test_y = train_test_split(train_feban_x0,train_feban_y , test_size=0.25,random_state=59)
+
+#2.样本均衡
+data_train_y.value_counts()
+
+data_train_x['Purchase'] = data_train_y
+train_fe_banlance = sample_banlance(data_train_x[data_train_x['Purchase']==1],data_train_x[data_train_x['Purchase']==0])
+data_train_y = train_fe_banlance['Purchase']
+data_train_x = train_fe_banlance.drop(['Purchase'],axis=1)
+
+data_train_y.value_counts()
+
+####模型训练
 
 from sklearn.linear_model.logistic import LogisticRegression
 from sklearn import svm
@@ -87,11 +122,6 @@ from sklearn.model_selection import GridSearchCV
 import xgboost as xgb
 from xgboost.sklearn import XGBClassifier
 import lightgbm as lgb
-
-
-data_train_x, data_test_x, data_train_y, data_test_y = train_test_split(train_feban_x0, train_feban_y, test_size=0.25,random_state=59)
-data_train_y.value_counts()
-data_test_y.value_counts()
 
 def show_accuracy(model,x_train,x_test,y_train,y_test):
     from sklearn.metrics import accuracy_score, recall_score, precision_score, f1_score
@@ -132,7 +162,7 @@ model1 = model.best_estimator_
 show_accuracy(model1,data_train_x, data_test_x, data_train_y, data_test_y)
 
 
-#####自定义调参
+#lightgbm 自定义调参
 lgbm = lgb.LGBMClassifier(boosting_type='gbdt',
                          objective = 'binary',
                          metric = 'auc',
@@ -155,6 +185,14 @@ model.fit(data_train_x,data_train_y)
 print('最优参数：', model.best_params_)
 model1 = model.best_estimator_
 show_accuracy(model1,data_train_x, data_test_x, data_train_y, data_test_y)
+
+#模型组合
+1.定义函数，参数选定使用哪些模型；
+2.通过网格搜索确定模型最优参数；
+3.输出模型训练集测试集得分情况，dataframe，多个模型结果横向对比
+4.输出模型
+5.模型结果计算
+
 
 
 
