@@ -23,8 +23,8 @@ from sklearn.model_selection import train_test_split
 
 
 print(os.getcwd())
-#os.chdir('D:\\work\\sky_drive\\git\\cda2\\testdata1')
-os.chdir('D:\\py_project\\cda2\\testdata1')
+os.chdir('D:\\work\\sky_drive\\git\\cda2\\testdata1')
+#os.chdir('D:\\py_project\\cda2\\testdata1')
 
 test = pd.read_csv("test30.csv",na_values= ['nan','?'])
 train = pd.read_csv("training30.csv",na_values= ['nan','?'])
@@ -155,8 +155,19 @@ def show_accuracy(model,x_train,x_test,y_train,y_test):
     print(pd.Series(model_accu))
     return pd.Series(model_accu)
     
+#逻辑回归
+lr = LogisticRegression(penalty='l2') 
+#设置样本为非平衡样本  设置正负样本权重lr = LogisticRegression(class_weight={0:0.3,1:0.7}) 
+param = {'C':np.arange(0.5,2,0.2),
+         'penalty':['l1','l2']
+        }
+model = GridSearchCV(lr, param_grid=param, cv=4,scoring='f1',n_jobs=-1,verbose=5)
+model_lr = model.fit(train_x, train_y)
+lr_best = model_lr.best_estimator_
+
 
 #随机森林
+print('#'*10+'随机森林调参'+'#'*10)
 rf = RandomForestClassifier(n_estimators=50, criterion='gini', max_depth=7, min_samples_leaf=11, min_samples_split=30, max_features=0.5,n_jobs=-1)
 param = {'n_estimators':np.arange(50,200,25),
          'max_features':np.arange(2, 8),
@@ -165,20 +176,23 @@ param = {'n_estimators':np.arange(50,200,25),
         #'min_samples_split':np.arange(2, 53, 10)
 		'class_weight':['balanced', None]
         }
-model = GridSearchCV(rf, param_grid=param, cv=4,scoring='f1',n_jobs=-1,verbose=5)
+model = GridSearchCV(rf, param_grid=param, cv=4,scoring='f1',n_jobs=-1,verbose=1)
 model.fit(data_train_x, data_train_y)
-print('最优参数：', model.best_params_)
+params = model.best_params_
 model1 = model.best_estimator_
+print(params)
 rf_model_resule = show_accuracy(model1,data_train_x, data_test_x, data_train_y, data_test_y)
+
+
+
 
 
 #lightgbm 自定义调参
 lgbm = lgb.LGBMClassifier(boosting_type='gbdt',
                          objective = 'binary',
                          metric = 'auc',
-                         verbose = 0,
-                         is_unbalance=True,
-                         learning_rate = 0.1,
+                         #is_unbalance=True,
+                         learning_rate = 0.01,
                          num_leaves = 35,
                          feature_fraction=0.8,
                          bagging_fraction= 0.9,
@@ -280,7 +294,7 @@ show_accuracy(model_lgb,data_train_x, data_test_x, data_train_y, data_test_y)
 
 
 ####多阶段调参
-##一、
+#一、
 params = {    'boosting_type': 'gbdt', 
     'objective': 'binary', 
     'learning_rate': 0.1, 
@@ -297,7 +311,7 @@ print('best n_estimators:', len(cv_results['auc-mean']))
 print('best cv score:', pd.Series(cv_results['auc-mean']).max())
 
 
-###二、
+#二、
 model_lgb = lgb.LGBMClassifier(objective='binary',
                               num_leaves=50,
                               learning_rate=0.05, 
@@ -319,7 +333,7 @@ gsearch1.fit(data_train_x,data_train_y)
 gsearch1.cv_results_['mean_test_score'] , gsearch1.best_params_, gsearch1.best_score_
 
 
-###三、
+#三、
 params_test3={'min_child_samples': np.arange(5, 25),
               'min_child_weight':np.arange(0, 0.005, 0.001)
               }
@@ -338,7 +352,7 @@ gsearch3 = GridSearchCV(estimator=model_lgb, param_grid=params_test3, scoring='f
 gsearch3.fit(data_train_x,data_train_y)
 gsearch3.best_params_, gsearch3.best_score_
 
-###四、
+#四、
 params_test4={
         'feature_fraction': [0.2,0.3,0.4,0.5, 0.6, 0.7, 0.8, 0.9],
         'bagging_fraction': [0.6, 0.7, 0.8, 0.9, 1.0]
@@ -353,7 +367,7 @@ gsearch4 = GridSearchCV(estimator=model_lgb, param_grid=params_test4, scoring='f
 gsearch4.fit(data_train_x,data_train_y)
 gsearch4.best_params_, gsearch4.best_score_
 
-###五、
+#五、
 params_test6={
         'lambda_l1': [0, 0.001, 0.01, 0.03, 0.08, 0.3, 0.5],  
         #'lambda_l1': np.arange(0.2, 0.5, 0.05),  
@@ -370,7 +384,7 @@ gsearch6.fit(data_train_x,data_train_y)
 gsearch6.best_params_, gsearch6.best_score_
 
     
-###六、
+#六、
 params = {'boosting_type': 'gbdt', 'objective': 'binary', 
           'learning_rate': 0.005, 'n_estimators':29,
           'max_depth': 7,'num_leaves': 50,
