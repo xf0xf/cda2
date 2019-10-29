@@ -165,6 +165,15 @@ model = GridSearchCV(lr, param_grid=param, cv=4,scoring='f1',n_jobs=-1,verbose=5
 model_lr = model.fit(train_x, train_y)
 lr_best = model_lr.best_estimator_
 
+#svm
+clf=svm.SVC(C=0.8, kernel='rbf')
+param_test = {
+ 'C':np.arange(0.1,2.0,0.1),
+ 'kernel':['linear','poly','rbf','sigmoid','precomputed']}
+gsearch1 = GridSearchCV(clf,param_grid = param_test,scoring='f1',n_jobs=-1,iid=False,cv=4)
+gsearch1.fit(data_x,data_y)
+gsearch1.best_params_, gsearch1.best_score_
+
 
 #随机森林
 print('#'*10+'随机森林调参'+'#'*10)
@@ -184,6 +193,22 @@ print(params)
 rf_model_resule = show_accuracy(model1,data_train_x, data_test_x, data_train_y, data_test_y)
 
 
+#xgboost
+gbm = xgb.XGBClassifier(learning_rate =0.1,n_estimators=100,max_depth=5,min_child_weight=1,gamma=0,subsample=0.8,colsample_bytree=0.8,objective= 'binary:logistic',nthread=4,scale_pos_weight=1,seed=13)
+param_test = {
+ 'max_depth':range(3,10,1),
+ 'min_child_weight':range(3,10,1),
+ 'max_depth':range(3,10,1),
+ 'min_child_weight':range(3,10,1),
+ 'gamma':range(0.1,0.8,0.1),
+ 'subsample':range(0.1,1,0.1),
+ 'colsample_bytree':range(0.1,1,0.1)}
+model = GridSearchCV(gbm,param_grid = param_test,scoring='recall',n_jobs=-1,cv=4)
+model.fit(train_x, train_y)
+print(model.best_params_,model.best_score_)
+model1 = model.best_estimator_
+pred_xgb = model1.predict(test_x)
+print(classification_report(test_y, pred_xgb))
 
 
 
