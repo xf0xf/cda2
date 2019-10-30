@@ -108,14 +108,14 @@ train_feban_x0 = train_fe.drop(['Purchase','ID'],axis=1)
 data_train_x, data_test_x, data_train_y, data_test_y = train_test_split(train_feban_x0,train_feban_y , test_size=0.25,random_state=59)
 
 #2.样本均衡
-data_train_y.value_counts()
-
-data_train_x['Purchase'] = data_train_y
-train_fe_banlance = sample_banlance(data_train_x[data_train_x['Purchase']==1],data_train_x[data_train_x['Purchase']==0])
-data_train_y = train_fe_banlance['Purchase']
-data_train_x = train_fe_banlance.drop(['Purchase'],axis=1)
-
-data_train_y.value_counts()
+#data_train_y.value_counts()
+#
+#data_train_x['Purchase'] = data_train_y
+#train_fe_banlance = sample_banlance(data_train_x[data_train_x['Purchase']==1],data_train_x[data_train_x['Purchase']==0])
+#data_train_y = train_fe_banlance['Purchase']
+#data_train_x = train_fe_banlance.drop(['Purchase'],axis=1)
+#
+#data_train_y.value_counts()
 
 ########## 四、模型训练 ##########
 
@@ -129,7 +129,7 @@ import xgboost as xgb
 from xgboost.sklearn import XGBClassifier
 import lightgbm as lgb
 
-def show_accuracy(model,x_train,x_test,y_train,y_test):
+def show_accuracy(model,x_train=data_train_x,x_test=data_test_x,y_train=data_train_y,y_test=data_test_y):
     from sklearn.metrics import accuracy_score, recall_score, precision_score, f1_score
     from sklearn.metrics import roc_curve
     from sklearn import metrics
@@ -152,27 +152,33 @@ def show_accuracy(model,x_train,x_test,y_train,y_test):
                   'test_f1_score':round(f1_score(y_test, y_test_pre),4),
                   'test_auc':round(metrics.auc(fpr,tpr),4)
                   }
-    print(pd.Series(model_accu))
+    #print(pd.Series(model_accu))
     return pd.Series(model_accu)
-    
+
+model_dict = {}
+
 #逻辑回归
 lr = LogisticRegression(penalty='l2') 
 #设置样本为非平衡样本  设置正负样本权重lr = LogisticRegression(class_weight={0:0.3,1:0.7}) 
-param = {'C':np.arange(0.5,2,0.2),
+param = {'C':np.arange(0.5,2,0.1),
          'penalty':['l1','l2']
         }
-model = GridSearchCV(lr, param_grid=param, cv=4,scoring='f1',n_jobs=-1,verbose=5)
-model_lr = model.fit(train_x, train_y)
-lr_best = model_lr.best_estimator_
+gsearch_lr = GridSearchCV(lr, param_grid=param, cv=4,scoring='f1',n_jobs=-1,verbose=5)
+gsearch_lr.fit(data_train_x, data_train_y)
+model_lr = gsearch_lr.best_estimator_
+model_dict['model_lr'] = model_lr
+gsearch_lr.best_params_,gsearch_lr.best_score_
 
 #svm
 clf=svm.SVC(C=0.8, kernel='rbf')
 param_test = {
  'C':np.arange(0.1,2.0,0.1),
  'kernel':['linear','poly','rbf','sigmoid','precomputed']}
-gsearch1 = GridSearchCV(clf,param_grid = param_test,scoring='f1',n_jobs=-1,iid=False,cv=4)
-gsearch1.fit(data_x,data_y)
-gsearch1.best_params_, gsearch1.best_score_
+gsearch_svm = GridSearchCV(clf,param_grid = param_test,scoring='f1',n_jobs=-1,cv=4,verbose=5)
+gsearch_svm.fit(data_train_x, data_train_y)
+model_svm = gsearch_svm.best_estimator_
+model_dict['model_svm'] = model_svm
+gsearch_svm.best_params_, gsearch_svm.best_score_
 
 
 #随机森林
@@ -185,11 +191,12 @@ param = {'n_estimators':np.arange(50,200,25),
         #'min_samples_split':np.arange(2, 53, 10)
 		'class_weight':['balanced', None]
         }
-model = GridSearchCV(rf, param_grid=param, cv=4,scoring='f1',n_jobs=-1,verbose=1)
-model.fit(data_train_x, data_train_y)
-params = model.best_params_
-model1 = model.best_estimator_
-print(params)
+gsearch_rf = GridSearchCV(rf, param_grid=param, cv=4,scoring='f1',n_jobs=-1,verbose=1)
+gsearch_rf.fit(data_train_x, data_train_y)
+model_rf = gsearch_rf.best_estimator_
+model_dict['model_rf'] = model_rf
+gsearch_rf.best_params_, gsearch_rf.best_score_
+
 rf_model_resule = show_accuracy(model1,data_train_x, data_test_x, data_train_y, data_test_y)
 
 
@@ -203,12 +210,12 @@ param_test = {
  'gamma':range(0.1,0.8,0.1),
  'subsample':range(0.1,1,0.1),
  'colsample_bytree':range(0.1,1,0.1)}
-model = GridSearchCV(gbm,param_grid = param_test,scoring='recall',n_jobs=-1,cv=4)
-model.fit(train_x, train_y)
-print(model.best_params_,model.best_score_)
-model1 = model.best_estimator_
-pred_xgb = model1.predict(test_x)
-print(classification_report(test_y, pred_xgb))
+gsearch_xgb = GridSearchCV(gbm,param_grid = param_test,scoring='recall',n_jobs=-1,cv=4)
+gsearch_xgb.fit(train_x, train_y)
+print(gsearch_xgb.best_params_,gsearch_xgb.best_score_)
+model_xgb = gsearch_xgb.best_estimator_
+model_dict['model_xgb'] = model_xgb
+
 
 
 
@@ -229,10 +236,13 @@ param_dist = {"max_depth": np.arange(10,40,5),
             "num_leaves": [100,200,300],
             "n_estimators": np.arange(50,100,10)
              }
-model = GridSearchCV(lgbm, n_jobs=-1, param_grid=param_dist, cv = 5, scoring="f1", verbose=5)
-model.fit(data_train_x,data_train_y)
-print('最优参数：', model.best_params_)
-model1 = model.best_estimator_
+gsearch_lgb = GridSearchCV(lgbm, n_jobs=-1, param_grid=param_dist, cv = 5, scoring="f1", verbose=5)
+gsearch_lgb.fit(data_train_x,data_train_y)
+print(gsearch_lgb.best_params_,gsearch_lgb.best_score_)
+model_lgb = gsearch_lgb.best_estimator_
+model_dict['model_lgb'] = model_lgb
+
+
 show_accuracy(model1,data_train_x, data_test_x, data_train_y, data_test_y)
 
 #模型组合
@@ -241,9 +251,25 @@ show_accuracy(model1,data_train_x, data_test_x, data_train_y, data_test_y)
 3.输出模型训练集测试集得分情况，dataframe，多个模型结果横向对比
 4.输出模型
 5.模型结果计算
+def models_score(model_dict):
+    result_score = pd.DataFrame()
+    for name,model in model_dict.items():
+        result_score[name] = show_accuracy(model,x_train,x_test,y_train,y_test)
+    return result_score
 
 
+#模型综合
+1.输入多个模型，输入数据
+2.使用模型分别预测出结果，并输出综合后的结果
+3.综合的方式包括投票（软、硬）
 
+def models_predict(model_dict,test_data):
+    result = pd.DataFrame()
+    for name, model in model_dict.items():
+        result[name] = model.predict(test_data)
+    result['volte_soft'] = result.apply(lambda x : 0 if np.sum(x)<(len(x)/2) else 1,axis=1)
+    result['volte_hard'] = result.apply(lambda x : 0 if np.sum(x)==0 else 1,axis=1)
+    return result
 
 '''
 1.多种模型结果最后训练分别提交
