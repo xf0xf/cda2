@@ -23,8 +23,8 @@ from sklearn.model_selection import train_test_split
 
 
 print(os.getcwd())
-os.chdir('D:\\work\\sky_drive\\git\\cda2\\testdata1')
-#os.chdir('D:\\py_project\\cda2\\testdata1')
+#os.chdir('D:\\work\\sky_drive\\git\\cda2\\testdata1')
+os.chdir('D:\\py_project\\cda2\\testdata1')
 
 test = pd.read_csv("test30.csv",na_values= ['nan','?'])
 train = pd.read_csv("training30.csv",na_values= ['nan','?'])
@@ -202,16 +202,14 @@ rf_model_resule = show_accuracy(model1,data_train_x, data_test_x, data_train_y, 
 
 #xgboost
 gbm = xgb.XGBClassifier(learning_rate =0.1,n_estimators=100,max_depth=5,min_child_weight=1,gamma=0,subsample=0.8,colsample_bytree=0.8,objective= 'binary:logistic',nthread=4,scale_pos_weight=1,seed=13)
-param_test = {
+param = {
  'max_depth':range(3,10,1),
  'min_child_weight':range(3,10,1),
- 'max_depth':range(3,10,1),
- 'min_child_weight':range(3,10,1),
- 'gamma':range(0.1,0.8,0.1),
- 'subsample':range(0.1,1,0.1),
- 'colsample_bytree':range(0.1,1,0.1)}
-gsearch_xgb = GridSearchCV(gbm,param_grid = param_test,scoring='recall',n_jobs=-1,cv=4)
-gsearch_xgb.fit(train_x, train_y)
+ 'gamma':np.arange(0.1,0.8,0.1),
+ 'subsample':np.arange(0.1,1,0.1),
+ 'colsample_bytree':np.arange(0.1,1,0.1)}
+gsearch_xgb = GridSearchCV(gbm,param_grid = param,scoring='f1',n_jobs=-1,cv=4,verbose=5)
+gsearch_xgb.fit(data_train_x, data_train_y)
 print(gsearch_xgb.best_params_,gsearch_xgb.best_score_)
 model_xgb = gsearch_xgb.best_estimator_
 model_dict['model_xgb'] = model_xgb
@@ -254,10 +252,10 @@ show_accuracy(model1,data_train_x, data_test_x, data_train_y, data_test_y)
 def models_score(model_dict):
     result_score = pd.DataFrame()
     for name,model in model_dict.items():
-        result_score[name] = show_accuracy(model,x_train,x_test,y_train,y_test)
+        result_score[name] = show_accuracy(model)
     return result_score
 
-
+print(models_score(model_dict))
 #模型综合
 1.输入多个模型，输入数据
 2.使用模型分别预测出结果，并输出综合后的结果
@@ -270,6 +268,9 @@ def models_predict(model_dict,test_data):
     result['volte_soft'] = result.apply(lambda x : 0 if np.sum(x)<(len(x)/2) else 1,axis=1)
     result['volte_hard'] = result.apply(lambda x : 0 if np.sum(x)==0 else 1,axis=1)
     return result
+
+test_fe = test_fe.drop(['Purchase','ID'],axis=1)
+result = models_predict(model_dict,test_fe)
 
 '''
 1.多种模型结果最后训练分别提交
@@ -288,6 +289,8 @@ train_feban_x0 = train_fe.drop(['Purchase','ID'],axis=1)
 
 
 ########## 五、预测 ##########
+rfc_submission = pd.DataFrame({'PassengerId': test['PassengerId'], 'Survived': rfc_y_predict})
+# rfc_submission.to_csv('rfc_submission.csv', index=False)
 
 
 ####复杂调参
